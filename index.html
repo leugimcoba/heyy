@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treasure Hunt Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .game-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 500px;
+            text-align: center;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        #status {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        #level {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        #encrypted-word {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ff5722; /* Optional: Change color for emphasis */
+        }
+
+        #clue-container {
+            margin-bottom: 20px;
+        }
+
+        #cipher-text {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .inventory {
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        .inventory p {
+            font-weight: bold;
+        }
+
+        .letter-box {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 2px solid #333;
+            margin: 5px;
+            text-align: center;
+            line-height: 40px;
+            font-size: 18px;
+            background-color: #f4f4f4;
+        }
+
+        .locked {
+            background-color: #ddd;
+        }
+
+        .hint-button {
+            background-color: #ff9800;
+            color: white;
+            padding: 10px 20px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .mini-game {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+
+        .maze-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .maze {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            grid-gap: 5px;
+        }
+
+        .maze div {
+            width: 50px;
+            height: 50px;
+            background-color: #ccc;
+            text-align: center;
+            line-height: 50px;
+        }
+
+        .start { background-color: green; color: white; }
+        .end { background-color: red; color: white; }
+        .path { background-color: white; }
+        .blocked { background-color: #444; }
+
+        /* Chest Unlock Styling */
+        .chest-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .chest {
+            width: 100px;
+            height: 100px;
+            background-color: gold;
+            border-radius: 5px;
+            margin: 0 auto;
+            position: relative;
+        }
+        .chest:before {
+            content: "🔒";
+            font-size: 40px;
+            position: absolute;
+            top: 30%;
+            left: 25%;
+        }
+
+        .chest.opened:before {
+            content: "🎉";
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Treasure Hunt Game</h1>
+        <p id="status">Welcome to the Treasure Hunt! Solve the clues to unlock the treasure!</p>
+        <p id="level">Level: 1</p> <!-- Level Indicator -->
+        <p id="encrypted-word">Encrypted Word: </p> <!-- Encrypted Word Display -->
+        <p id="default-hint">Default Hint: </p> <!-- Default Hint Display -->
+        <div id="clue-container">
+            <div id="letters-container"></div>
+            <input type="text" id="cipher-text" placeholder="Enter decoded clue" />
+            <button id="decode-button">Decode</button>
+            <div id="hint-section">
+                <button class="hint-button" id="get-hint">Get Hint (Cost: 15 points)</button>
+                <button class="hint-button" id="reveal-riddle">Reveal Riddle (Cost: 20 points)</button> <!-- New button -->
+                <p id="hint-message"></p>
+            </div>
+            <p id="clue-box"></p> <!-- Added this line to display the riddle -->
+        </div>
+        <div id="inventory" class="inventory"></div>
+        <div id="mini-game"></div>
+        <div id="maze-game" class="maze-container"></div>
+        <div id="chest" class="chest-container"></div>
+    </div>
+    <script>
+        let currentLevel = 1;
+        let score = 20;  // Initial hint points
+        let currentRiddle = '';
+        let decodedWord = '';
+        let inventoryItems = [];
+        let revealedLetters = [];
+        let hintCost = 15; // Update hint cost to 15
+        let riddleCost = 20; // Cost to reveal the riddle
+        let dynamicRiddles = [
+            { riddle: "I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?", answer: "echo", defaultHint: "sound" },
+            { riddle: "I have keys but open no locks. I have space but no room. You can enter, but you can't go outside. What am I?", answer: "keyboard", defaultHint: "object" },
+            { riddle: "What has to be broken before you can use it?", answer: "egg", defaultHint: "food" },
+            { riddle: "I’m tall when I’m young, and I’m short when I’m old. What am I?", answer: "candle", defaultHint: "object" },
+            { riddle: "What begins with T, ends with T, and has T in it?", answer: "teapot", defaultHint: "object" },
+            { riddle: "What has a heart that doesn’t beat?", answer: "artichoke", defaultHint: "food" },
+            { riddle: "What can travel around the world while staying in a corner?", answer: "stamp", defaultHint: "object" },
+            { riddle: "What has many teeth but cannot bite?", answer: "comb", defaultHint: "object" },
+            { riddle: "What is so fragile that saying its name breaks it?", answer: "silence", defaultHint: "concept" },
+            { riddle: "I can be cracked, made, told, and played. What am I?", answer: "joke", defaultHint: "entertainment" },
+            { riddle: "What is the one thing that all wise men, regardless of their religion or politics, agree is between heaven and earth?", answer: "and", defaultHint: "conjunction" },
+            { riddle: "I am not alive, but I can grow; I don’t have lungs, but I need air; I don’t have a mouth, but water kills me. What am I?", answer: "fire", defaultHint: "element" },
+            { riddle: "What is the sound of one hand clapping?", answer: "silence", defaultHint: "philosophical" },
+            { riddle: "If a tree falls in a forest and no one is around to hear it, does it make a sound?", answer: "depends on perception", defaultHint: "philosophical" },
+            { riddle: "What is the meaning of life?", answer: "subjective interpretation", defaultHint: "philosophical" },
+            { riddle: "Can you ever truly know another person?", answer: "no", defaultHint: "philosophical" }
+        ];
+    
+        const clueBox = document.getElementById('clue-box');
+        const cipherText = document.getElementById('cipher-text');
+        const decodeButton = document.getElementById('decode-button');
+        const getHintButton = document.getElementById('get-hint');
+        const revealRiddleButton = document.getElementById('reveal-riddle'); // New button reference
+        const hintMessage = document.getElementById('hint-message');
+        const lettersContainer = document.getElementById('letters-container');
+        const inventory = document.getElementById('inventory');
+        const mazeGame = document.getElementById('maze-game');
+        const chestContainer = document.getElementById('chest');
+        const status = document.getElementById('status');
+        const levelIndicator = document.getElementById('level'); // Level indicator element
+        const encryptedWordDisplay = document.getElementById('encrypted-word'); // Encrypted word display element
+        const defaultHintDisplay = document.getElementById('default-hint'); // Default hint display element
+    
+        // Update inventory display
+        function updateInventory() {
+            inventory.innerHTML = `<p>Score: ${score}</p>`;
+            inventoryItems.forEach(item => {
+                const itemDiv = document.createElement('p');
+                itemDiv.textContent = item;
+                inventory.appendChild(itemDiv);
+            });
+        }
+    
+        // Generate a dynamic riddle for the current level
+        function generateRiddle() {
+            let riddleObject = dynamicRiddles[currentLevel - 1];
+            decodedWord = riddleObject.answer;
+            encryptedWordDisplay.textContent = `Encrypted Word: ${btoa(decodedWord)}`; // Display encrypted word
+            defaultHintDisplay.textContent = `Default Hint: ${riddleObject.defaultHint}`; // Update default hint
+            revealedLetters = [];
+            displayLetters(decodedWord); // Create the letter boxes for the word
+        }
+    
+        // Display letter boxes for the decoded word
+        function displayLetters(word) {
+            lettersContainer.innerHTML = '';
+            for (let i = 0; i < word.length; i++) {
+                let box = document.createElement('div');
+                box.classList.add('letter-box');
+                box.classList.add('locked');
+                lettersContainer.appendChild(box);
+            }
+        }
+    
+        function checkAnswer(input) {
+            if (input.toLowerCase() === decodedWord.toLowerCase()) {
+                inventoryItems.push(`Unlocked: ${decodedWord}`);
+                score += 5; // Increase score by 5 for a correct answer
+                updateInventory();
+                currentLevel++;
+                levelIndicator.textContent = `Level: ${currentLevel}`; // Update level indicator
+                if (currentLevel <= dynamicRiddles.length) {
+                    generateRiddle();
+                    clueBox.textContent = ''; // Clear the clue box when moving to the next level
+                } else {
+                    // Clear the body and display the congratulations message
+                    document.body.innerHTML = '<h1>Congratulations! You have completed all levels!</h1>';
+                }
+            } else {
+                alert("Incorrect answer, try again!");
+            }
+        }
+    
+        // Chest unlock animation
+        function openChest() {
+            chestContainer.innerHTML = `<div class="chest opened"></div>
+                <p>Level Accomplished!</p>`; // Removed the click to reveal text
+            clueBox.textContent = ''; // Clear the clue box after unlocking
+        }
+    
+        // Reveal the riddle for the current level
+        function revealRiddle() {
+            let riddleObject = dynamicRiddles[currentLevel - 1];
+            currentRiddle = riddleObject.riddle;
+            clueBox.textContent = currentRiddle; // Display the riddle
+        }
+    
+        // Handle decoding button click
+        decodeButton.onclick = function() {
+            const playerInput = cipherText.value;
+            checkAnswer(playerInput);
+        };
+    
+        // Reveal one letter at a time using hints
+        getHintButton.onclick = function() {
+            if (score >= hintCost) {
+                score -= hintCost;
+                revealLetter();
+            } else {
+                hintMessage.textContent = "Not enough points for a hint!";
+            }
+            updateInventory();
+        };
+    
+        function revealLetter() {
+            const letterIndex = revealedLetters.length;
+            if (letterIndex < decodedWord.length) {
+                revealedLetters.push(letterIndex);
+                const letterBox = document.querySelectorAll('.letter-box')[letterIndex];
+                letterBox.textContent = decodedWord[letterIndex];
+            }
+            if (revealedLetters.length === decodedWord.length) {
+                hintMessage.textContent = "All letters revealed!";
+            }
+        }
+    
+        // Trigger a mini-game at level 5
+        function triggerMiniGame() {
+            mazeGame.style.display = "block";
+            mazeGame.innerHTML = `
+                <p>Mini-Game: Navigate the maze!</p>
+                <div class="maze">
+                    <div class="start">S</div>
+                    <div class="path"></div>
+                    <div class="path"></div>
+                    <div class="path"></div>
+                    <div class="end">E</div>
+                    <div class="blocked"></div>
+                    <div class="path"></div>
+                    <div class="blocked"></div>
+                    <div class="path"></div>
+                    <div class="blocked"></div>
+                </div>
+            `;
+            // Add mouse movement event to navigate the maze
+            mazeGame.onmousemove = function(event) {
+                const mazeCells = document.querySelectorAll('.maze div');
+                mazeCells.forEach(cell => {
+                    if (cell.classList.contains('blocked')) {
+                        cell.style.backgroundColor = '#444'; // Blocked cells
+                    } else {
+                        cell.style.backgroundColor = '#ccc'; // Path cells
+                    }
+                });
+                // Logic to detect if the mouse is over a blocked cell can be added here
+            };
+        }
+    
+        function startGame() {
+            generateRiddle();
+            updateInventory();
+            status.textContent = "Click 'Reveal Riddle' to see the clue!";
+        }
+    
+        // Reveal riddle button functionality
+        revealRiddleButton.onclick = function() {
+            if (score >= riddleCost) {
+                score -= riddleCost;
+                revealRiddle();
+                updateInventory();
+            } else {
+                hintMessage.textContent = "Not enough points to reveal the riddle!";
+            }
+        };
+    
+        startGame();
+    </script>
+</body>
+</html>
